@@ -1,0 +1,5 @@
+MetaTrader5
+pandas
+datetime
+plotly
+requests

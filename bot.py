@@ -3,20 +3,60 @@ import pandas as pd
 import time
 from datetime import datetime
 from account_credentials import LOGIN, PASSWORD, SERVER
+import plotly.express as px
+import requests
 
-symbol = 'DE40'
-timeframe = mt5.TIMEFRAME_M5
-volume = 0.5
-strategy_name = 'ma_trendfollowing'
+def check_allowed_trading_hours():
+    tick = mt5.symbol_info_tick(symbol)
+    # check the last price value to determine if the market is closed or available
+    if tick.time != 0:
+        market_status = True
+        #market open
+    else:
+        market_status = False
+        #market close
+    return market_status
+
+def market_order(symbol, volume, order_type, deviation=0, magic=123999):
+
+    order_type_dict = {
+        'buy': mt5.ORDER_TYPE_BUY,
+        'sell': mt5.ORDER_TYPE_SELL
+    }
+
+    price_dict = {
+        'buy': mt5.symbol_info_tick(symbol).ask,
+        'sell': mt5.symbol_info_tick(symbol).bid
+    }
+
+    if order_type == 'buy':
+        sl = mt5.symbol_info_tick(symbol).ask - (sl_price_range + spread)
+        tp = mt5.symbol_info_tick(symbol).ask + (tp_price_range + spread)
+    
+    if order_type == 'sell':
+        sl = mt5.symbol_info_tick(symbol).bid + (sl_price_range + spread)
+        tp = mt5.symbol_info_tick(symbol).bid - (tp_price_range + spread)
+
+    request = {
+        "action": mt5.TRADE_ACTION_DEAL,
+        "symbol": symbol,
+        "volume": volume,  # FLOAT
+        "type": order_type_dict[order_type],
+        "price": price_dict[order_type],
+        "sl": sl,  # FLOAT
+        "tp": tp,  # FLOAT
+        "deviation": deviation,  # INTERGER
+        "magic": magic,  # INTERGER
+        "comment": strategy_name,
+        "type_time": mt5.ORDER_TIME_GTC,
+        "type_filling": mt5.ORDER_FILLING_IOC,
+    }
+
+    order_result = mt5.order_send(request)
+    return(order_result)
 
 
-def get_sma(symbol, timeframe, period):
-    sma = pd.DataFrame(mt5.copy_rates_from_pos(symbol, timeframe, 1, period))['close'].mean()
-
-    return sma
-
-
-def close_position(position, deviation=20, magic=12345):
+def close_position(position, deviation=0, magic=123999):
 
     order_type_dict = {
         0: mt5.ORDER_TYPE_SELL,
@@ -45,7 +85,6 @@ def close_position(position, deviation=20, magic=12345):
     order_result = mt5.order_send(request)
     return(order_result)
 
-
 def close_positions(order_type):
     order_type_dict = {
         'buy': 0,
@@ -66,43 +105,14 @@ def close_positions(order_type):
             print('order_result: ', order_result)
 
 
-def check_allowed_trading_hours():
-    if 9 < datetime.now().hour < 17:
-        return True
-    else:
-        return False
-
-
-def market_order(symbol, volume, order_type, deviation=20, magic=12345):
-
-    order_type_dict = {
-        'buy': mt5.ORDER_TYPE_BUY,
-        'sell': mt5.ORDER_TYPE_SELL
-    }
-
-    price_dict = {
-        'buy': mt5.symbol_info_tick(symbol).ask,
-        'sell': mt5.symbol_info_tick(symbol).bid
-    }
-
-    request = {
-        "action": mt5.TRADE_ACTION_DEAL,
-        "symbol": symbol,
-        "volume": volume,  # FLOAT
-        "type": order_type_dict[order_type],
-        "price": price_dict[order_type],
-        "sl": 0.0,  # FLOAT
-        "tp": 0.0,  # FLOAT
-        "deviation": deviation,  # INTERGER
-        "magic": magic,  # INTERGER
-        "comment": strategy_name,
-        "type_time": mt5.ORDER_TIME_GTC,
-        "type_filling": mt5.ORDER_FILLING_IOC,
-    }
-
-    order_result = mt5.order_send(request)
-    return(order_result)
-
+symbol = 'XAUUSD'
+timeframe = mt5.TIMEFRAME_H1
+volume = 0.01
+strategy_name = 'ML_lsvm'
+sl_price_range = 3
+tp_price_range = 3
+spread = .125
+deviation_delayed_trade = 0.100 #abs(current close price - previous complete close price) for example |1900.000 -1901.111| = 1.111
 
 if __name__ == '__main__':
     is_initialized = mt5.initialize()
@@ -112,33 +122,96 @@ if __name__ == '__main__':
     print('logged in: ', is_logged_in)
     print('\n')
 
-    while True:
-        account_info = mt5.account_info()
-        print(datetime.now(),
-              '| Login: ', account_info.login,
-              '| Balance: ', account_info.balance,
-              '| Equity: ' , account_info.equity)
+#### RUN ONCE TO CREATE A RECORD.CSV FILE
+time_records = pd.read_csv('time_records.csv')
+if len(time_records) > 0:
+    print('Your already have a time_records file: CONTINUE')
+else:
+    rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, 1)
+    price_data = rates[0]
+    open_price = price_data[1]
+    high_price = price_data[2]
+    low_price = price_data[3]
+    close_price = price_data[4]
+    time_trade = datetime.fromtimestamp(price_data[0])
 
-        num_positions = mt5.positions_total()
+    time_records = [time_trade]
+    records_df = pd.DataFrame({'time_records': time_records})
+    records_df.to_csv('time_records.csv', index=False)
+    print('Created a time_records file')
 
-        if not check_allowed_trading_hours():
-            close_positions('all')
+time.sleep(2)
+time_records = pd.read_csv('time_records.csv')
+while True:
+    account_info = mt5.account_info()
+    print(datetime.now(),
+            '| Login: ', account_info.login,
+            '| Balance: ', account_info.balance,
+            '| Equity: ' , account_info.equity)
+    num_positions = mt5.positions_total()
+    print()
+    print('Current Number of Positions: ',num_positions)
 
-        fast_sma = get_sma(symbol, timeframe, 10)
-        slow_sma = get_sma(symbol, timeframe, 100)
+    if check_allowed_trading_hours() == False:
+        if num_positions > 0:
+            close_position('all')
+            print('Closed all position')
 
-        if fast_sma > slow_sma:
-            close_positions('sell')
+        time.sleep(2)
 
-            if num_positions == 0 and check_allowed_trading_hours():
-                order_result = market_order(symbol, volume, 'buy')
-                print(order_result)
+    elif check_allowed_trading_hours() == True:
+        # get the latest completed bar ( position [0])
+        price_data = mt5.copy_rates_from_pos(symbol, timeframe, 0, 2)[0] 
+        current_candle = mt5.copy_rates_from_pos(symbol, timeframe, 0, 2)[1]
+        open = price_data[1]
+        high = price_data[2]
+        low = price_data[3]
+        close = price_data[4] #This is all bid price on both completed and current candlestick
+        time_trade = datetime.fromtimestamp(price_data[0])
+        print("Complete candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(time_trade,price_data[1],price_data[2],price_data[3],price_data[4]))
+        print("Current candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(datetime.fromtimestamp(current_candle[0]),current_candle[1],current_candle[2],current_candle[3],current_candle[4]))
 
-        elif fast_sma < slow_sma:
-            close_positions('buy')
+        if time_trade not in time_records:
+            url = "http://127.0.0.1:5000/predict_api"
 
-            if num_positions == 0 and check_allowed_trading_hours():
-                order_result = market_order(symbol, volume, 'sell')
-                print(order_result)
+            data = {
+                "data": {
+                    "open": open,
+                    "high": high,
+                    "low": low,
+                    "close": close
+                }
+            }
+            try:
+                response = requests.post(url, json=data)
+            except:
+                print("Cannot Reach ML Server, Aborting the bot")
+                break
 
-        time.sleep(1)
+            if response.status_code == 200:
+                prediction = response.json()
+                print('prediction: ', prediction)
+                
+            else:
+                print("POST request failed!")
+                print(response.status_code)
+
+            if prediction == 1:
+                if (price_data[4] - current_candle[4]) > deviation_delayed_trade:
+                    print("Deviation = {0} >>> No Trade, close price is out of deviation, wait for completed candle in the next hour".format((price_data[4] - current_candle[4])))
+                elif(price_data[4] - current_candle[4]) <= deviation_delayed_trade:
+                    order_result = market_order(symbol, volume, 'buy')
+                    if order_result.retcode == mt5.TRADE_RETCODE_DONE: # check if trading order is successful
+                        print("Deviation = {0} >>> Made a trade at: {1}".format((price_data[4] - current_candle[4]), time_trade))
+                        new_row = pd.DataFrame({'time_records':[time_trade]})
+                        time_records = pd.concat([time_records, new_row], axis=0) # love .append T.T
+                        time_records.to_csv('time_records.csv') # record traded order by timestamp
+                    else:
+                        "Sending order is not successful"
+            
+            if prediction == 0:
+                pass
+
+            time.sleep(2)
+    else:
+        raise ValueError('Failed on Checking market status')
