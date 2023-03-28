@@ -171,6 +171,7 @@ while True:
         print("Complete candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(time_trade,price_data[1],price_data[2],price_data[3],price_data[4]))
         print("Current candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(datetime.fromtimestamp(current_candle[0]),current_candle[1],current_candle[2],current_candle[3],current_candle[4]))
 
+        ### Model LSVM BUY----------------------------------------------------------------
         if time_trade not in time_records:
             url = "http://127.0.0.1:5000/predict_api"
 
@@ -206,12 +207,22 @@ while True:
                         new_row = pd.DataFrame({'time_records':[time_trade]})
                         time_records = pd.concat([time_records, new_row], axis=0) # love .append T.T
                         time_records.to_csv('time_records.csv') # record traded order by timestamp
+                        #HW RECORD OPEN HIGH LOW CLOSE, PREDICTION TO CS
                     else:
                         "Sending order is not successful"
             
             if prediction == 0:
+                #HW RECORD OPEN HIGH LOW CLOSE, PREDICTION TO CSV
                 pass
+            ### ---------------------------------------------------------------------------------
 
-            time.sleep(2)
+            ###HW Model LSVM BUY & SELL ----------------------------------------------------------------
+            ### ---------------------------------------------------------------------------------
+
+
+        ###HW ใส่ elif ว่า record แล้ว( if in time_records) แล้ว len ดู ข้อมูลตัวสุดท้ายใน df ว่า prediction เป็นเท่าไร แบบว่า ชั่วโมงนี้ predict ไปแล้วนะเว้ย ซึง เท่ากับ 1 หรือ 0 ก็ว่าไป
+            #CODE HERE
+
+        time.sleep(2)
     else:
         raise ValueError('Failed on Checking market status')

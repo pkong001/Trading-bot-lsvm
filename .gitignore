@@ -2,3 +2,5 @@ vbot/
 account_credentials.py
 __pycache__
 tryrequest.ipynb
+test.py
+check_time_records.py
