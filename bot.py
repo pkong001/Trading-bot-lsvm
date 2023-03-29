@@ -112,7 +112,8 @@ strategy_name = 'ML_lsvm'
 sl_price_range = 3
 tp_price_range = 3
 spread = .125
-deviation_delayed_trade = 0.100 #abs(current close price - previous complete close price) for example |1900.000 -1901.111| = 1.111
+deviation_delayed_trade = 0.300 #abs(current close price - previous complete close price) for example |1900.000 -1901.111| = 1.111
+num_positions_max = 5
 
 if __name__ == '__main__':
     is_initialized = mt5.initialize()
@@ -123,12 +124,11 @@ if __name__ == '__main__':
     print('\n')
 
 #### RUN ONCE TO CREATE A RECORD.CSV FILE
-time_records = pd.read_csv('time_records.csv')
-if len(time_records) > 0:
+try:
+    time_records = pd.read_csv('time_records.csv')
     print('Your already have a time_records file: CONTINUE')
-else:
-    rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, 1)
-    price_data = rates[0]
+except:
+    price_data = mt5.copy_rates_from_pos(symbol, timeframe, 0, 2)[0]
     open_price = price_data[1]
     high_price = price_data[2]
     low_price = price_data[3]
@@ -140,8 +140,8 @@ else:
     records_df.to_csv('time_records.csv', index=False)
     print('Created a time_records file')
 
-time.sleep(2)
-time_records = pd.read_csv('time_records.csv')
+time.sleep(2) # wait for server to start
+
 while True:
     account_info = mt5.account_info()
     print(datetime.now(),
@@ -150,14 +150,12 @@ while True:
             '| Equity: ' , account_info.equity)
     num_positions = mt5.positions_total()
     print()
-    print('Current Number of Positions: ',num_positions)
+    print('Current Number of Positions: {0} (max:{1})'.format(num_positions,num_positions_max))
 
     if check_allowed_trading_hours() == False:
         if num_positions > 0:
             close_position('all')
             print('Closed all position')
-
-        time.sleep(2)
 
     elif check_allowed_trading_hours() == True:
         # get the latest completed bar ( position [0])
@@ -171,8 +169,24 @@ while True:
         print("Complete candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(time_trade,price_data[1],price_data[2],price_data[3],price_data[4]))
         print("Current candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(datetime.fromtimestamp(current_candle[0]),current_candle[1],current_candle[2],current_candle[3],current_candle[4]))
 
+        # Adjust time_trade format
+        time_trade_str = time_trade.strftime('%Y-%m-%d %H:%M:%S')
+        time_trade_ts = pd.Timestamp(time_trade_str)
+        rounded_time_trade = time_trade_ts.floor('H')
+        # Adjust imported time_records format
+        time_records['time_records'] = pd.to_datetime(time_records['time_records'], format='%Y-%m-%d %H:%M:%S')
+        rounded_time_records = time_records['time_records'].dt.floor('H')
+
+        # temp check
+        if rounded_time_trade not in rounded_time_records.values:
+            print("It's not in  SO LET TRADE")
+            print(rounded_time_trade)
+        else:
+            print("It's in the recorded")
+            print(rounded_time_trade)
+
         ### Model LSVM BUY----------------------------------------------------------------
-        if time_trade not in time_records:
+        if (rounded_time_trade not in rounded_time_records.values) and (num_positions <= 5):
             url = "http://127.0.0.1:5000/predict_api"
 
             data = {
@@ -198,9 +212,9 @@ while True:
                 print(response.status_code)
 
             if prediction == 1:
-                if (price_data[4] - current_candle[4]) > deviation_delayed_trade:
+                if abs(price_data[4] - current_candle[4]) > deviation_delayed_trade:
                     print("Deviation = {0} >>> No Trade, close price is out of deviation, wait for completed candle in the next hour".format((price_data[4] - current_candle[4])))
-                elif(price_data[4] - current_candle[4]) <= deviation_delayed_trade:
+                elif abs(price_data[4] - current_candle[4]) <= deviation_delayed_trade:
                     order_result = market_order(symbol, volume, 'buy')
                     if order_result.retcode == mt5.TRADE_RETCODE_DONE: # check if trading order is successful
                         print("Deviation = {0} >>> Made a trade at: {1}".format((price_data[4] - current_candle[4]), time_trade))
@@ -223,6 +237,6 @@ while True:
         ###HW ใส่ elif ว่า record แล้ว( if in time_records) แล้ว len ดู ข้อมูลตัวสุดท้ายใน df ว่า prediction เป็นเท่าไร แบบว่า ชั่วโมงนี้ predict ไปแล้วนะเว้ย ซึง เท่ากับ 1 หรือ 0 ก็ว่าไป
             #CODE HERE
 
-        time.sleep(2)
+        time.sleep(1)
     else:
         raise ValueError('Failed on Checking market status')
