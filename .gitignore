@@ -4,3 +4,5 @@ __pycache__
 tryrequest.ipynb
 test.py
 check_time_records.py
+backup/
+test.ipynb

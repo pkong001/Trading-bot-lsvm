@@ -122,6 +122,11 @@ if __name__ == '__main__':
     is_logged_in = mt5.login(LOGIN, PASSWORD, SERVER)
     print('logged in: ', is_logged_in)
     print('\n')
+    account_info = mt5.account_info()
+    print(datetime.now(),
+        '| Login: ', account_info.login,
+        '| Balance: ', account_info.balance,
+        '| Equity: ' , account_info.equity)
 
 #### RUN ONCE TO CREATE A RECORD.CSV FILE
 try:
@@ -137,20 +142,21 @@ except:
 
     time_records = [time_trade]
     records_df = pd.DataFrame({'time_records': time_records})
-    records_df.to_csv('time_records.csv', index=False)
+    records_df.to_csv('time_records.csv')
     print('Created a time_records file')
 
 time.sleep(2) # wait for server to start
+print('Running')
 
 while True:
-    account_info = mt5.account_info()
-    print(datetime.now(),
-            '| Login: ', account_info.login,
-            '| Balance: ', account_info.balance,
-            '| Equity: ' , account_info.equity)
-    num_positions = mt5.positions_total()
+
     print()
-    print('Current Number of Positions: {0} (max:{1})'.format(num_positions,num_positions_max))
+    num_positions = mt5.positions_total()
+    current_time = mt5.copy_rates_from_pos(symbol,mt5.TIMEFRAME_M1,0,1)
+    current_time = datetime.fromtimestamp(current_time[0][0])
+    print('Current Number of Positions: \033[1m{0}\033[0m (max:{1}) ||| Current Time: \033[1m{2}\033[0m'.format(num_positions,num_positions_max,current_time))
+
+
 
     if check_allowed_trading_hours() == False:
         if num_positions > 0:
@@ -166,8 +172,10 @@ while True:
         low = price_data[3]
         close = price_data[4] #This is all bid price on both completed and current candlestick
         time_trade = datetime.fromtimestamp(price_data[0])
+        
         print("Complete candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(time_trade,price_data[1],price_data[2],price_data[3],price_data[4]))
-        print("Current candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(datetime.fromtimestamp(current_candle[0]),current_candle[1],current_candle[2],current_candle[3],current_candle[4]))
+        print("Current candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: \033[1m{4}\033[0m".format(datetime.fromtimestamp(current_candle[0]),current_candle[1],current_candle[2],current_candle[3],current_candle[4]))
+        # HW logging price here
 
         # Adjust time_trade format
         time_trade_str = time_trade.strftime('%Y-%m-%d %H:%M:%S')
@@ -180,10 +188,10 @@ while True:
         # temp check
         if rounded_time_trade not in rounded_time_records.values:
             print("It's not in  SO LET TRADE")
-            print(rounded_time_trade)
+            #print(rounded_time_trade)
         else:
             print("It's in the recorded")
-            print(rounded_time_trade)
+            #print(rounded_time_trade)
 
         ### Model LSVM BUY----------------------------------------------------------------
         if (rounded_time_trade not in rounded_time_records.values) and (num_positions <= 5):
@@ -218,7 +226,14 @@ while True:
                     order_result = market_order(symbol, volume, 'buy')
                     if order_result.retcode == mt5.TRADE_RETCODE_DONE: # check if trading order is successful
                         print("Deviation = {0} >>> Made a trade at: {1}".format((price_data[4] - current_candle[4]), time_trade))
-                        new_row = pd.DataFrame({'time_records':[time_trade]})
+                        new_row = pd.DataFrame({'time_records':[time_trade],
+                                                'open':[open],
+                                                'high':[high],
+                                                'low':[low],
+                                                'close':[close],
+                                                'prediction':[prediction],
+                                                'ticket':[order_result.order],
+                                                'order price':[mt5.orders_get(ticket=order_result.order)[0]]})
                         time_records = pd.concat([time_records, new_row], axis=0) # love .append T.T
                         time_records.to_csv('time_records.csv') # record traded order by timestamp
                         #HW RECORD OPEN HIGH LOW CLOSE, PREDICTION TO CS
@@ -226,7 +241,16 @@ while True:
                         "Sending order is not successful"
             
             if prediction == 0:
-                #HW RECORD OPEN HIGH LOW CLOSE, PREDICTION TO CSV
+                new_row = pd.DataFrame({'time_records':[time_trade],
+                                                'open':[open],
+                                                'high':[high],
+                                                'low':[low],
+                                                'close':[close],
+                                                'prediction':[prediction],
+                                                'ticket':['none'],
+                                                'order price':['none']})
+                time_records = pd.concat([time_records, new_row], axis=0)
+                time_records.to_csv('time_records.csv')
                 pass
             ### ---------------------------------------------------------------------------------
 
