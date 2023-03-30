@@ -142,7 +142,7 @@ except:
 
     time_records = [time_trade]
     records_df = pd.DataFrame({'time_records': time_records})
-    records_df.to_csv('time_records.csv')
+    records_df.to_csv('time_records.csv', index = False)
     print('Created a time_records file')
 
 time.sleep(2) # wait for server to start
@@ -175,6 +175,7 @@ while True:
         
         print("Complete candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(time_trade,price_data[1],price_data[2],price_data[3],price_data[4]))
         print("Current candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: \033[1m{4}\033[0m".format(datetime.fromtimestamp(current_candle[0]),current_candle[1],current_candle[2],current_candle[3],current_candle[4]))
+        print("\033[1mLastest Record Time: {0}\033[0m ||| \033[1mLastest Record Prediction {1}\033[0m".format(str(time_records['time_records'].tail(1)),int(time_records['prediction'].tail(1))))
         # HW logging price here
 
         # Adjust time_trade format
@@ -182,7 +183,7 @@ while True:
         time_trade_ts = pd.Timestamp(time_trade_str)
         rounded_time_trade = time_trade_ts.floor('H')
         # Adjust imported time_records format
-        time_records['time_records'] = pd.to_datetime(time_records['time_records'], format='%Y-%m-%d %H:%M:%S')
+        time_records['time_records'] = pd.to_datetime(time_records['time_records'], format='%m/%d/%Y %H:%M')
         rounded_time_records = time_records['time_records'].dt.floor('H')
 
         # temp check
@@ -235,7 +236,7 @@ while True:
                                                 'ticket':[order_result.order],
                                                 'order price':[mt5.orders_get(ticket=order_result.order)[0]]})
                         time_records = pd.concat([time_records, new_row], axis=0) # love .append T.T
-                        time_records.to_csv('time_records.csv') # record traded order by timestamp
+                        time_records.to_csv('time_records.csv', index = False) # record traded order by timestamp
                         #HW RECORD OPEN HIGH LOW CLOSE, PREDICTION TO CS
                     else:
                         "Sending order is not successful"
@@ -250,7 +251,7 @@ while True:
                                                 'ticket':['none'],
                                                 'order price':['none']})
                 time_records = pd.concat([time_records, new_row], axis=0)
-                time_records.to_csv('time_records.csv')
+                time_records.to_csv('time_records.csv', index = False)
                 pass
             ### ---------------------------------------------------------------------------------
 
