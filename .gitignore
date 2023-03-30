@@ -6,3 +6,6 @@ test.py
 check_time_records.py
 backup/
 test.ipynb
+test_prediction.py
+bot_log.log
+test_log.py

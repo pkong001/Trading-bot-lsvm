@@ -5,6 +5,17 @@ from datetime import datetime
 from account_credentials import LOGIN, PASSWORD, SERVER
 import plotly.express as px
 import requests
+import logging
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[logging.FileHandler('bot_log.log', mode='a'), logging.StreamHandler()]
+)
+
+# Get the logger instance
+logger = logging.getLogger()
 
 def check_allowed_trading_hours():
     tick = mt5.symbol_info_tick(symbol)
@@ -102,7 +113,7 @@ def close_positions(order_type):
         for i, position in positions_df.iterrows():
             order_result = close_position(position)
 
-            print('order_result: ', order_result)
+            logging.debug.debug('order_result: ', order_result)
 
 
 symbol = 'XAUUSD'
@@ -117,7 +128,7 @@ num_positions_max = 5
 
 if __name__ == '__main__':
     is_initialized = mt5.initialize()
-    print('initialize: ', is_initialized)
+    logging.debug('initialize: ', is_initialized)
 
     is_logged_in = mt5.login(LOGIN, PASSWORD, SERVER)
     print('logged in: ', is_logged_in)
@@ -131,7 +142,7 @@ if __name__ == '__main__':
 #### RUN ONCE TO CREATE A RECORD.CSV FILE
 try:
     time_records = pd.read_csv('time_records.csv')
-    print('Your already have a time_records file: CONTINUE')
+    logging.debug('Your already have a time_records file: CONTINUE')
 except:
     price_data = mt5.copy_rates_from_pos(symbol, timeframe, 0, 2)[0]
     open_price = price_data[1]
@@ -143,10 +154,10 @@ except:
     time_records = [time_trade]
     records_df = pd.DataFrame({'time_records': time_records})
     records_df.to_csv('time_records.csv', index = False)
-    print('Created a time_records file')
+    logging.debug('Created a time_records file')
 
 time.sleep(2) # wait for server to start
-print('Running')
+logging.debug('Running')
 
 while True:
 
@@ -154,14 +165,14 @@ while True:
     num_positions = mt5.positions_total()
     current_time = mt5.copy_rates_from_pos(symbol,mt5.TIMEFRAME_M1,0,1)
     current_time = datetime.fromtimestamp(current_time[0][0])
-    print('Current Number of Positions: \033[1m{0}\033[0m (max:{1}) ||| Current Time: \033[1m{2}\033[0m'.format(num_positions,num_positions_max,current_time))
+    logging.debug('Current Number of Positions: \033[1m{0}\033[0m (max:{1}) ||| Current Time: \033[1m{2}\033[0m'.format(num_positions,num_positions_max,current_time))
 
 
 
     if check_allowed_trading_hours() == False:
         if num_positions > 0:
             close_position('all')
-            print('Closed all position')
+            logging.debug('Closed all position')
 
     elif check_allowed_trading_hours() == True:
         # get the latest completed bar ( position [0])
@@ -173,9 +184,9 @@ while True:
         close = price_data[4] #This is all bid price on both completed and current candlestick
         time_trade = datetime.fromtimestamp(price_data[0])
         
-        print("Complete candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(time_trade,price_data[1],price_data[2],price_data[3],price_data[4]))
-        print("Current candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: \033[1m{4}\033[0m".format(datetime.fromtimestamp(current_candle[0]),current_candle[1],current_candle[2],current_candle[3],current_candle[4]))
-        print("\033[1mLastest Record Time: {0}\033[0m ||| \033[1mLastest Record Prediction {1}\033[0m".format(str(time_records['time_records'].tail(1)),int(time_records['prediction'].tail(1))))
+        logging.debug("Complete candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: {4}".format(time_trade,price_data[1],price_data[2],price_data[3],price_data[4]))
+        logging.debug("Current candle >> Time: {0}, Open: {1}, High: {2}, Low: {3}, Close: \033[1m{4}\033[0m".format(datetime.fromtimestamp(current_candle[0]),current_candle[1],current_candle[2],current_candle[3],current_candle[4]))
+        logging.debug("\033[1mLastest Record Time: {0}\033[0m ||| \033[1mLastest Record Prediction {1}\033[0m".format(str(time_records['time_records'].tail(1)),int(time_records['prediction'].tail(1))))
         # HW logging price here
 
         # Adjust time_trade format
@@ -209,24 +220,24 @@ while True:
             try:
                 response = requests.post(url, json=data)
             except:
-                print("Cannot Reach ML Server, Aborting the bot")
+                logging.debug("Cannot Reach ML Server, Aborting the bot")
                 break
 
             if response.status_code == 200:
                 prediction = response.json()
-                print('prediction: ', prediction)
+                logging.info('prediction: ', prediction)
                 
             else:
-                print("POST request failed!")
-                print(response.status_code)
+                logging.info("POST request failed!")
+                logging.info(response.status_code)
 
             if prediction == 1:
                 if abs(price_data[4] - current_candle[4]) > deviation_delayed_trade:
-                    print("Deviation = {0} >>> No Trade, close price is out of deviation, wait for completed candle in the next hour".format((price_data[4] - current_candle[4])))
+                    logging.info("Deviation = {0} >>> No Trade, close price is out of deviation, wait for completed candle in the next hour".format((price_data[4] - current_candle[4])))
                 elif abs(price_data[4] - current_candle[4]) <= deviation_delayed_trade:
                     order_result = market_order(symbol, volume, 'buy')
                     if order_result.retcode == mt5.TRADE_RETCODE_DONE: # check if trading order is successful
-                        print("Deviation = {0} >>> Made a trade at: {1}".format((price_data[4] - current_candle[4]), time_trade))
+                        logging.info("Deviation = {0} >>> Made a trade at: {1}".format((price_data[4] - current_candle[4]), time_trade))
                         new_row = pd.DataFrame({'time_records':[time_trade],
                                                 'open':[open],
                                                 'high':[high],
