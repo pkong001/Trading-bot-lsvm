@@ -128,7 +128,7 @@ num_positions_max = 5
 
 if __name__ == '__main__':
     is_initialized = mt5.initialize()
-    logging.debug('initialize: ', is_initialized)
+    print('initialize: ', is_initialized)
 
     is_logged_in = mt5.login(LOGIN, PASSWORD, SERVER)
     print('logged in: ', is_logged_in)
@@ -194,8 +194,13 @@ while True:
         time_trade_ts = pd.Timestamp(time_trade_str)
         rounded_time_trade = time_trade_ts.floor('H')
         # Adjust imported time_records format
-        time_records['time_records'] = pd.to_datetime(time_records['time_records'], format='%m/%d/%Y %H:%M')
-        rounded_time_records = time_records['time_records'].dt.floor('H')
+        try:
+            time_records['time_records'] = pd.to_datetime(time_records['time_records'], format='%m/%d/%Y %H:%M')
+            rounded_time_records = time_records['time_records'].dt.floor('H')
+        except:
+            time_records['time_records'] = pd.to_datetime(time_records['time_records'], format='%Y/%m/%d %H:%M:%S')
+            rounded_time_records = time_records['time_records'].dt.floor('H')
+
 
         # temp check
         if rounded_time_trade not in rounded_time_records.values:
