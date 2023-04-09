@@ -113,7 +113,7 @@ def close_positions(order_type):
         for i, position in positions_df.iterrows():
             order_result = close_position(position)
 
-            logging.debug.debug('order_result: ', order_result)
+            logging.info('order_result: ', order_result)
 
 
 symbol = 'XAUUSD'
@@ -222,16 +222,16 @@ while True:
                     "close": close
                 }
             }
+
             try:
                 response = requests.post(url, json=data)
             except:
-                logging.debug("Cannot Reach ML Server, Aborting the bot")
+                logging.info("Cannot Reach ML Server, Aborting the bot")
                 break
 
             if response.status_code == 200:
                 prediction = response.json()
-                logging.info('prediction: ', prediction)
-                
+                logging.info('prediction: {0}'.format(prediction))
             else:
                 logging.info("POST request failed!")
                 logging.info(response.status_code)
@@ -242,7 +242,7 @@ while True:
                 elif abs(price_data[4] - current_candle[4]) <= deviation_delayed_trade:
                     order_result = market_order(symbol, volume, 'buy')
                     if order_result.retcode == mt5.TRADE_RETCODE_DONE: # check if trading order is successful
-                        logging.info("Deviation = {0} >>> Made a trade at: {1}".format((price_data[4] - current_candle[4]), time_trade))
+                        logging.info("Deviation = {0} >>> Made a trade at: {1}".format(abs(price_data[4] - current_candle[4]), time_trade))
                         new_row = pd.DataFrame({'time_records':[time_trade],
                                                 'open':[open],
                                                 'high':[high],
@@ -250,7 +250,7 @@ while True:
                                                 'close':[close],
                                                 'prediction':[prediction],
                                                 'ticket':[order_result.order],
-                                                'order price':[mt5.orders_get(ticket=order_result.order)[0]]})
+                                                'order price':[order_result[4]]})
                         time_records = pd.concat([time_records, new_row], axis=0) # love .append T.T
                         time_records.to_csv('time_records.csv', index = False) # record traded order by timestamp
                         #HW RECORD OPEN HIGH LOW CLOSE, PREDICTION TO CS
