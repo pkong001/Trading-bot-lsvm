@@ -116,6 +116,12 @@ def close_positions(order_type):
 
             logging.info('order_result: ', order_result)
 
+# Make change to the repository so we don't get an error when define commiting line
+import sys
+sys.path.insert(0,'current_time')
+from create_current_time import get_current_time
+get_current_time()
+
 # To run this function you have to work in the correct directory of git bash
 def get_go():
     # Run git status command
@@ -294,22 +300,12 @@ while True:
                 time_records = pd.concat([time_records, new_row], axis=0)
                 time_records.to_csv('time_records.csv', index = False)
                 pass
-            ### ---------------------------------------------------------------------------------
-
-            ###HW Model LSVM BUY & SELL ----------------------------------------------------------------
-            ### ---------------------------------------------------------------------------------
-
-
-        ###HW ใส่ elif ว่า record แล้ว( if in time_records) แล้ว len ดู ข้อมูลตัวสุดท้ายใน df ว่า prediction เป็นเท่าไร แบบว่า ชั่วโมงนี้ predict ไปแล้วนะเว้ย ซึง เท่ากับ 1 หรือ 0 ก็ว่าไป
-            #CODE HERE
-
-    
     else:
         raise ValueError('Failed on Checking market status')
     
     # This will push to git main every "running_count" loop
-    running_count = 0
-    if (running_count % 1800) == 0:
+    running_count = 1
+    if (running_count % 3601) == 0:
         get_go()
         print('pushed to git')
     running_count += 1
